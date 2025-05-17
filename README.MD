@@ -1,7 +1,5 @@
 # Audio to Voice Converter Bot
 
-## O‘zbekcha
-
 ### Bot haqida
 Ushbu Telegram boti foydalanuvchilar yuborgan ovozli xabarlarni (OGG formatida) MP3 formatiga aylantirib, ularga qaytaradi. Shuningdek, bot foydalanuvchi statistikasini saqlaydi va adminlar uchun statistika ma’lumotlarini ko‘rsatadi.
 
