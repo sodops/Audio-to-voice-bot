@@ -68,6 +68,16 @@ const trimAudio = (inputPath: string, outputPath: string, duration: number): Pro
     });
 };
 
+function escapeMarkdown(text: string = ""): string {
+    return text
+        .replace(/_/g, "\\_")
+        .replace(/\*/g, "\\*")
+        .replace(/\[/g, "\\[")
+        .replace(/`/g, "\\`")
+        .replace(/\(/g, "\\(")
+        .replace(/\)/g, "\\)");
+}
+
 // /start komandasi
 bot.command("start", async (ctx) => {
     const userId = ctx.from?.id;
@@ -106,7 +116,9 @@ bot.command("stats", async (ctx) => {
     try {
         const userStats = JSON.parse(fs.readFileSync(userStatsFile, "utf-8"));
         const allUsers = Object.entries(userStats)
-            .map(([id, user]: any) => `🆔 ${id} | 👤 ${user.firstName} (${user.username || "N/A"})`)
+            .map(([id, user]: any) =>
+                `🆔 ${id} | 👤 ${escapeMarkdown(user.firstName)} (${escapeMarkdown(user.username) || "N/A"})`
+            )
             .join("\n");
 
         await reply(ctx, `📊 Barcha foydalanuvchilar ro‘yxati:\n\n${allUsers}`);
