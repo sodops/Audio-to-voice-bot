@@ -1,7 +1,8 @@
 import { Bot, Context, InputFile } from "grammy";
 import { ratelimiter } from "@grammyjs/ratelimiter";
 import dotenv from "dotenv";
-import fs from "fs/promises";
+import fsPromises from "fs/promises"; // Renamed to avoid confusion
+import { createWriteStream } from "fs"; // Import createWriteStream from fs
 import ffmpeg from "fluent-ffmpeg";
 import { fetch } from "undici";
 import { pipeline } from "stream";
@@ -29,11 +30,11 @@ interface UserStats {
 // Papkalarni tekshirish yoki yaratish
 const initializeFiles = async () => {
     try {
-        await fs.mkdir(outputDir, { recursive: true });
+        await fsPromises.mkdir(outputDir, { recursive: true });
         try {
-            await fs.access(userStatsFile);
+            await fsPromises.access(userStatsFile);
         } catch {
-            await fs.writeFile(userStatsFile, "{}");
+            await fsPromises.writeFile(userStatsFile, "{}");
         }
     } catch (err) {
         console.error("Papka/fayl yaratishda xatolik:", err);
@@ -44,9 +45,9 @@ const initializeFiles = async () => {
 // Statistika saqlash
 const saveUserStats = async (userId: number, firstName: string, username: string | undefined) => {
     try {
-        const userStats: UserStats = JSON.parse(await fs.readFile(userStatsFile, "utf-8"));
+        const userStats: UserStats = JSON.parse(await fsPromises.readFile(userStatsFile, "utf-8"));
         userStats[userId] = { firstName, username };
-        await fs.writeFile(userStatsFile, JSON.stringify(userStats, null, 2));
+        await fsPromises.writeFile(userStatsFile, JSON.stringify(userStats, null, 2));
     } catch (err) {
         console.error("Statistikani saqlashda xatolik:", err);
     }
@@ -79,7 +80,7 @@ const trimAudio = (inputPath: string, outputPath: string, duration: number): Pro
             .audioBitrate("64k")
             .format("oga")
             .on("end", () => resolve())
-            .on("error", (err) => reject(new Error(`Audio konvertatsiyasida xatolik: ${err.message}`)))
+            .on("error", (err: Error) => reject(new Error(`Audio konvertatsiyasida xatolik: ${err.message}`)))
             .save(outputPath);
     });
 };
@@ -120,7 +121,7 @@ bot.command("stats", async (ctx) => {
     }
 
     try {
-        const userStats: UserStats = JSON.parse(await fs.readFile(userStatsFile, "utf-8"));
+        const userStats: UserStats = JSON.parse(await fsPromises.readFile(userStatsFile, "utf-8"));
         const allUsers = Object.entries(userStats)
             .map(([id, user]) => `🆔 ${id} | 👤 ${user.firstName} (${user.username || "N/A"})`)
             .join("\n");
@@ -157,11 +158,11 @@ bot.on("message:audio", async (ctx) => {
         if (!res.ok) throw new Error(`Audio faylni yuklab bo‘lmadi: ${res.status}`);
         if (!res.body) throw new Error("Response body yo‘q");
 
-        await pipelineAsync(res.body, fs.createWriteStream(tempPath));
+        await pipelineAsync(res.body, createWriteStream(tempPath));
         await trimAudio(tempPath, trimmedPath, MAX_DURATION);
 
         await ctx.replyWithVoice(new InputFile(trimmedPath), { caption });
-    } catch (err) {
+    } catch (err: Error) {
         console.error("❌ Audio ishlovida xatolik:", err);
         await reply(ctx, `⚠️ Xatolik yuz berdi: ${err.message}. Iltimos, keyinroq urinib ko‘ring.`);
     } finally {
@@ -169,7 +170,7 @@ bot.on("message:audio", async (ctx) => {
         await Promise.all(
             [tempPath, trimmedPath]
                 .filter(file => file) // Faqat bo‘sh bo‘lmagan fayllarni o‘chirish
-                .map(file => fs.unlink(file).catch(err => console.warn("Faylni o‘chirishda xatolik:", file, err)))
+                .map(file => fsPromises.unlink(file).catch((err: Error) => console.warn("Faylni o‘chirishda xatolik:", file, err)))
         );
     }
 });
@@ -195,7 +196,7 @@ const keepAlive = async () => {
     try {
         await fetch("https://audio-to-voice-bot.onrender.com");
     } catch (err) {
-        console.warn("Keep-alive xatosi:", err.message);
+        console.warn("Keep-alive xatosi:", err);
     }
 };
 
