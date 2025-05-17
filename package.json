@@ -19,7 +19,8 @@
     "ffmpeg-static": "^5.1.0",
     "fluent-ffmpeg": "^2.1.2",
     "grammy": "^1.16.1",
-    "undici": "^6.6.0"
+    "undici": "^6.6.0",
+    "mongodb": "^6.5.0"
   },
   "devDependencies": {
     "@types/express": "^4.17.17",
@@ -30,4 +31,4 @@
   }
 }
 
-  
+
