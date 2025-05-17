@@ -11,6 +11,7 @@
   "author": "Egor Becker & ChatGPT",
   "license": "MIT",
   "dependencies": {
+     "express": "^4.18.2",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@telegraf/session": "^2.0.0-beta.7",
     "@types/ffmpeg-static": "^3.0.1",
