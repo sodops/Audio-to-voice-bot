@@ -22,6 +22,11 @@ if (!fs.existsSync(userStatsFile)) {
     fs.writeFileSync(userStatsFile, "{}");
 }
 
+// MarkdownV2 uchun escape funksiyasi
+const escapeMarkdownV2 = (text: string) => {
+    return text.replace(/[_*[\]()~`>#+\-=|{}.!]/g, "\\$&");
+};
+
 // Statistika saqlash
 const saveUserStats = (userId: number, firstName: string, username: string | undefined) => {
     const userStats = JSON.parse(fs.readFileSync(userStatsFile, "utf-8"));
@@ -35,7 +40,7 @@ const bot = new Bot(process.env.TOKEN!);
 // Oddiy reply helper
 const reply = async (ctx: Context, text: string) => {
     try {
-        await ctx.reply(text, { parse_mode: "Markdown" });
+        await ctx.reply(escapeMarkdownV2(text), { parse_mode: "MarkdownV2" });
     } catch (err) {
         console.error("Javob berishda xatolik:", err);
     }
@@ -81,7 +86,7 @@ bot.command("help", async (ctx) => {
     await reply(ctx,
         `ℹ️ *Yordam:*\n\n` +
         `📤 Menga audio fayl yuboring — men uni ovozli xabar shaklida qaytaraman.\n` +
-        `⏱ Maksimal 60 sekundlik qismi olinadi.\n` 
+        `⏱ Maksimal 60 sekundlik qismi olinadi.\n`
     );
 });
 
@@ -164,7 +169,7 @@ process.once("SIGTERM", () => bot.stop());
 
 // Botni ishga tushurish
 bot.start();
-setInterval(() => {
-  fetch("https://audio-to-voice-bot.onrender.com").catch((err) => console.error("Keep-alive error:", err));
-}, 5 * 60 * 1000); // Har 5 daqiqa
 
+setInterval(() => {
+    fetch("https://audio-to-voice-bot.onrender.com").catch((err) => console.error("Keep-alive error:", err));
+}, 5 * 60 * 1000); // Har 5 daqiqa
