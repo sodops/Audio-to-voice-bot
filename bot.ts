@@ -1,4 +1,4 @@
-    import { Bot, Context, InputFile } from "grammy";
+import { Bot, Context, InputFile } from "grammy";
     import dotenv from "dotenv";
     import fs from "fs";
     import ffmpeg from "fluent-ffmpeg";
@@ -34,9 +34,7 @@
 
     // MongoDBga ulanish
     async function connectDb() {
-        if (!client.topology || !client.topology.isConnected()) {
-            await client.connect();
-        }
+        await client.connect();
     }
 
     // Foydalanuvchini saqlash
