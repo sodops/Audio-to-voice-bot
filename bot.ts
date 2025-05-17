@@ -2,44 +2,37 @@ import { Bot, Context, InputFile } from "grammy";
 import dotenv from "dotenv";
 import fs from "fs";
 import ffmpeg from "fluent-ffmpeg";
-import fetch from "node-fetch";
+import { fetch } from "undici";
 import { pipeline } from "stream";
 import { promisify } from "util";
+import path from "path";
 
 dotenv.config();
 
 const pipelineAsync = promisify(pipeline);
 const outputDir = "output";
-const MAX_DURATION = 60; // Telegram voice message limit (60s)
+const userStatsFile = "user_stats.json";
+const MAX_DURATION = 60; // sekund
 
-// Papka mavjudligini tekshirish yoki yaratish
+// Papkalarni tekshirish yoki yaratish
 if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir);
 }
-
-const userStatsFile = "user_stats.json"; // Statistika saqlanadigan fayl
+if (!fs.existsSync(userStatsFile)) {
+    fs.writeFileSync(userStatsFile, "{}");
+}
 
 // Statistika saqlash
 const saveUserStats = (userId: number, firstName: string, username: string | undefined) => {
-    const userStats = fs.existsSync(userStatsFile)
-        ? JSON.parse(fs.readFileSync(userStatsFile, "utf-8"))
-        : {};
-
-    // Foydalanuvchi ma'lumotlarini qo'shish yoki yangilash
+    const userStats = JSON.parse(fs.readFileSync(userStatsFile, "utf-8"));
     userStats[userId] = { firstName, username };
-
-    // Faylga saqlash
     fs.writeFileSync(userStatsFile, JSON.stringify(userStats, null, 2));
 };
 
-// Bot egasi ID sini .env faylidan olish
 const BOT_OWNER_ID = process.env.BOT_OWNER_ID;
+const bot = new Bot(process.env.TOKEN!);
 
-// Bot yaratish
-// @ts-ignore
-const bot = new Bot(process.env.TOKEN);
-
-// Oddiy javob yozuvchi funksiya
+// Oddiy reply helper
 const reply = async (ctx: Context, text: string) => {
     try {
         await ctx.reply(text, { parse_mode: "Markdown" });
@@ -48,134 +41,126 @@ const reply = async (ctx: Context, text: string) => {
     }
 };
 
-// Audio faylni kesish (1 daqiqagacha)
+// Audio faylni kesish va oga formatga o‘tkazish
 const trimAudio = (inputPath: string, outputPath: string, duration: number): Promise<void> => {
     return new Promise((resolve, reject) => {
         ffmpeg(inputPath)
             .setStartTime(0)
             .duration(duration)
-            .audioChannels(1) // Yagona kanal (mono)
-            .audioFrequency(48000) // 48kHz
+            .audioChannels(1)
+            .audioFrequency(48000)
             .audioCodec("libopus")
-            .audioBitrate("64k") // Bitrate balansli
+            .audioBitrate("64k")
             .format("oga")
             .on("end", () => resolve())
             .on("error", reject)
             .save(outputPath);
     });
 };
-// Botga /start komandasi
+
+// /start komandasi
 bot.command("start", async (ctx) => {
     const userId = ctx.from?.id;
     const firstName = ctx.from?.first_name;
     const username = ctx.from?.username;
 
     if (userId && firstName) {
-        // Statistika saqlash
         saveUserStats(userId, firstName, username);
     }
 
     await reply(ctx,
-        `👋 Salom, ${ctx.from?.first_name || "foydalanuvchi"}!\n\n` +
-        `🎧 Menga audio fayl yuboring — men uni ovozli xabar shaklida qaytaraman!\n` +
-        `⏱ Agar audio 1 daqiqadan uzun bo‘lsa, faqat 1 daqiqalik qismi yuboriladi.\n\n` +
-        `Made by - [Sodiq](t.me/sodiqqq)`
+        `👋 Salom, ${firstName}!\n\n` +
+        `🎧 Menga *audio fayl* yuboring — men uni ovozli xabar shaklida qaytaraman.\n` +
+        `⏱ 1 daqiqadan uzun bo‘lsa, faqat birinchi 60 soniyasi olinadi.\n\n` +
+        `Made by - [Sodiq](https://t.me/sodops)`
     );
 });
 
-// Faqat bot egasi uchun /stats komandasini qo‘shish
+// /help komandasi
+bot.command("help", async (ctx) => {
+    await reply(ctx,
+        `ℹ️ *Yordam:*\n\n` +
+        `📤 Menga audio fayl yuboring — men uni ovozli xabar shaklida qaytaraman.\n` +
+        `⏱ Maksimal 60 sekundlik qismi olinadi.\n` 
+    );
+});
+
+// /stats — faqat bot egasiga
 bot.command("stats", async (ctx) => {
-    const userId = ctx.from?.id;
+    const userId = ctx.from?.id?.toString();
 
-    if (!userId) {
-        await reply(ctx, "❌ Sizning identifikatsiyangizni olishda xatolik yuz berdi.");
-        return;
-    }
-
-    // Faqat bot egasi uchun
-    if (userId.toString() !== BOT_OWNER_ID) {
-        await reply(ctx, "❌ Bu buyruq faqat bot egasi uchun mavjud.");
-        return;
+    if (userId !== BOT_OWNER_ID) {
+        return reply(ctx, "❌ Bu buyruq faqat bot egasi uchun.");
     }
 
     try {
-        // Statistika faylini o‘qish
-        const userStats = fs.existsSync(userStatsFile)
-            ? JSON.parse(fs.readFileSync(userStatsFile, "utf-8"))
-            : {};
+        const userStats = JSON.parse(fs.readFileSync(userStatsFile, "utf-8"));
+        const allUsers = Object.entries(userStats)
+            .map(([id, user]: any) => `🆔 ${id} | 👤 ${user.firstName} (${user.username || "N/A"})`)
+            .join("\n");
 
-        // Foydalanuvchi statistikasi mavjudligini tekshirish
-        const user = userStats[userId];
-        if (user) {
-            await reply(ctx, 
-                `🔍 Foydalanuvchi Statistikasi:\n` +
-                `👤 Ism: ${user.firstName}\n` +
-                `📱 Username: ${user.username || "N/A"}`
-            );
-        } else {
-            await reply(ctx, "⚠️ Sizning statistikangiz mavjud emas.");
-        }
+        await reply(ctx, `📊 Barcha foydalanuvchilar ro‘yxati:\n\n${allUsers}`);
     } catch (err) {
-        console.error("❌ Xatolik:", err);
-        await reply(ctx, "⚠️ Statistikani olishda xatolik yuz berdi.");
+        console.error("Statistika xatoligi:", err);
+        await reply(ctx, "⚠️ Statistikani o‘qishda xatolik yuz berdi.");
     }
 });
 
-// Asosiy audio ishlov berish (faqat audio fayllarni qabul qilish)
+// Audio fayl kelganda ishlov berish
 bot.on("message:audio", async (ctx) => {
     const audio = ctx.message.audio;
-    const caption = ctx.message.caption || "";
     const fileId = audio.file_id;
+    const caption = ctx.message.caption || "";
 
-    await reply(ctx, "✅ Audio qabul qilindi. Iltimos kuting, ishlov berilmoqda...");
+    await reply(ctx, "✅ Audio qabul qilindi. Iltimos, kuting...");
 
     try {
         const file = await ctx.api.getFile(fileId);
-        if (!file.file_path) throw new Error("Fayl yo‘li topilmadi.");
-
         const fileUrl = `https://api.telegram.org/file/bot${bot.token}/${file.file_path}`;
-        const tempPath = `${outputDir}/${fileId}.mp3`;
-        const trimmedPath = `${outputDir}/${fileId}_trimmed.oga`;
+        const timestamp = Date.now();
+        const tempPath = path.join(outputDir, `${fileId}_${timestamp}.mp3`);
+        const trimmedPath = path.join(outputDir, `${fileId}_${timestamp}_trimmed.oga`);
 
-        const response = await fetch(fileUrl);
-        if (!response.ok || !response.body) {
-            throw new Error("Faylni yuklab olishda xatolik.");
-        }
+        const res = await fetch(fileUrl);
+        if (!res.ok || !res.body) throw new Error("Audio faylni yuklab bo‘lmadi.");
 
-        // Yuklab olish
-        await pipelineAsync(response.body, fs.createWriteStream(tempPath));
+        await pipelineAsync(res.body, fs.createWriteStream(tempPath));
 
-        // Trim qilish
-        const isLong = audio.duration > MAX_DURATION;
-        if (isLong) {
-            await reply(ctx, "⚠️ Audio 1 daqiqadan uzun. Faqat 60 soniyalik qism yuboriladi.");
+        if (audio.duration > MAX_DURATION) {
+            await reply(ctx, "⚠️ Audio 60 soniyadan uzun edi. Faqat birinchi qismini yuboraman.");
         }
 
         await trimAudio(tempPath, trimmedPath, MAX_DURATION);
 
-        // Ovozli habar sifatida qaytarish
         await ctx.replyWithVoice(new InputFile(trimmedPath), { caption });
 
         // Tozalash
-        [tempPath, trimmedPath].forEach((path) => {
-            fs.unlink(path, (err) => {
-                if (err) console.warn("Faylni o‘chirishda xatolik:", path, err);
-            });
-        });
-
+        [tempPath, trimmedPath].forEach((file) =>
+            fs.unlink(file, (err) => {
+                if (err) console.warn("Faylni o‘chirishda xatolik:", file);
+            })
+        );
     } catch (err) {
-        console.error("❌ Xatolik:", err);
-        await reply(ctx, "⚠️ Nimadadir xatolik yuz berdi. Iltimos, keyinroq qayta urinib ko‘ring.");
+        console.error("❌ Audio ishlovida xatolik:", err);
+        await reply(ctx, "⚠️ Xatolik yuz berdi. Iltimos, keyinroq urinib ko‘ring.");
     }
 });
 
-// Faqat audio qabul qilinmasa
+// Voice yuborsa eslatma
+bot.on("message:voice", async (ctx) => {
+    await reply(ctx, "📢 Iltimos, voice emas, *audio fayl* yuboring.");
+});
+
+// Boshqa har qanday xabar uchun
 bot.on("message", async (ctx) => {
-    // Komanda bo‘lmagan boshqa xabarlar uchun faqat audio kutiladi
     if (!ctx.message.audio) {
-        await reply(ctx, "🚫 Iltimos, menga audio fayl yuboring.");
+        await reply(ctx, "📩 Faqat audio fayl yuboring.");
     }
 });
+
+// Toza yopish
+process.once("SIGINT", () => bot.stop());
+process.once("SIGTERM", () => bot.stop());
 
 // Botni ishga tushurish
 bot.start();
