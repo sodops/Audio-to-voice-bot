@@ -164,3 +164,7 @@ process.once("SIGTERM", () => bot.stop());
 
 // Botni ishga tushurish
 bot.start();
+setInterval(() => {
+  fetch("https://audio-to-voice-bot.onrender.com").catch((err) => console.error("Keep-alive error:", err));
+}, 5 * 60 * 1000); // Har 5 daqiqa
+
