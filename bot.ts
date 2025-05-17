@@ -6,7 +6,17 @@ import { fetch } from "undici";
 import { pipeline } from "stream";
 import { promisify } from "util";
 import path from "path";
+import express from "express";
+const app = express();
+const PORT = process.env.PORT || 3000;
 
+app.get("/", (req, res) => {
+  res.send("Bot ishlayapti!");
+});
+
+app.listen(PORT, () => {
+  console.log(`Server portda tinglanmoqda: ${PORT}`);
+});
 dotenv.config();
 
 const pipelineAsync = promisify(pipeline);
